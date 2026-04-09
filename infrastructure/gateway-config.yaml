@@ -1,0 +1,19 @@
+model_list:
+  - model_name: qwen3.5
+    litellm_params:
+      model: ollama/qwen3.5:9B
+      api_base: http://host.containers.internal:11434
+      merge_reasoning_content_in_choices: true
+  - model_name: gemma4
+    litellm_params:
+      model: ollama/gemma4:e4b
+      api_base: http://host.containers.internal:11434
+      merge_reasoning_content_in_choices: true
+
+litellm_settings:
+  turn_off_message_logging: true
+  global_disable_no_log_param: true
+
+general_settings:
+  master_key: sk-local-dev-master-key
+  database_url: postgresql://litellm:litellm-local-dev@postgres:5432/litellm

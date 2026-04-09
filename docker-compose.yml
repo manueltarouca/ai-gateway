@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: litellm-local-dev
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U litellm']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    ports:
+      - '4000:4000'
+    volumes:
+      - ./infrastructure/gateway-config.yaml:/app/config.yaml
+    command:
+      - '--config=/app/config.yaml'
+      - '--port=4000'
+      - '--telemetry=False'
+    environment:
+      - DATABASE_URL=postgresql://litellm:litellm-local-dev@postgres:5432/litellm
+      - LITELLM_MASTER_KEY=sk-local-dev-master-key
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

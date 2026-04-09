@@ -1,0 +1,17 @@
+# Frontend (cloned externally)
+frontend/
+
+# Vision document (private)
+docs/VISION.md
+
+# Credentials and secrets
+.env
+*.env
+*.key
+
+# Docker volumes
+postgres-data/
+
+# OS files
+.DS_Store
+Thumbs.db

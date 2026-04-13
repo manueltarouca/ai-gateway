@@ -12,6 +12,11 @@ docs/VISION.md
 # Docker volumes
 postgres-data/
 
+# Docs build
+docs/node_modules/
+docs/build/
+docs/.docusaurus/
+
 # Python
 __pycache__/
 .venv/

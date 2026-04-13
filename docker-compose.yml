@@ -47,6 +47,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://litellm:litellm-local-dev@postgres:5432/litellm
       - PORT=9090
+      - ADMIN_KEY=sk-local-dev-master-key
     depends_on:
       postgres:
         condition: service_healthy

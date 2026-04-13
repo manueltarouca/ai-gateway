@@ -138,6 +138,55 @@ func (s *Store) Activate(ctx context.Context, nodeID string) error {
 	return nil
 }
 
+// List returns all community nodes, optionally filtered by status.
+func (s *Store) List(ctx context.Context, status string) ([]Node, error) {
+	var query string
+	var args []any
+
+	if status != "" {
+		query = `SELECT id, name, public_key, models, vram_mb, status, last_heartbeat, kudos, created_at
+			FROM community_nodes WHERE status = $1 ORDER BY created_at DESC`
+		args = append(args, status)
+	} else {
+		query = `SELECT id, name, public_key, models, vram_mb, status, last_heartbeat, kudos, created_at
+			FROM community_nodes ORDER BY created_at DESC`
+	}
+
+	rows, err := s.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var nodes []Node
+	for rows.Next() {
+		var n Node
+		var modelsRaw []byte
+		if err := rows.Scan(&n.ID, &n.Name, &n.PublicKey, &modelsRaw, &n.VramMB, &n.Status, &n.LastHeartbeat, &n.Kudos, &n.CreatedAt); err != nil {
+			return nil, err
+		}
+		json.Unmarshal(modelsRaw, &n.Models)
+		nodes = append(nodes, n)
+	}
+	return nodes, nil
+}
+
+// Suspend transitions any node to suspended status.
+func (s *Store) Suspend(ctx context.Context, nodeID string) error {
+	tag, err := s.pool.Exec(ctx,
+		`UPDATE community_nodes SET status = 'suspended', updated_at = now()
+		 WHERE id = $1 AND status != 'suspended'`,
+		nodeID,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func isDuplicateKey(err error) bool {
 	return err != nil && containsDuplicate(err.Error())
 }

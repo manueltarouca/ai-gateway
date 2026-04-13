@@ -16,8 +16,9 @@ import (
 )
 
 type server struct {
-	nodes *node.Store
-	tasks *queue.Store
+	nodes    *node.Store
+	tasks    *queue.Store
+	adminKey string
 }
 
 func main() {
@@ -32,9 +33,18 @@ func main() {
 	}
 	defer pool.Close()
 
+	adminKey := os.Getenv("ADMIN_KEY")
+	if adminKey == "" {
+		adminKey = os.Getenv("LITELLM_MASTER_KEY")
+	}
+	if adminKey == "" {
+		log.Fatal("ADMIN_KEY or LITELLM_MASTER_KEY is required")
+	}
+
 	s := &server{
-		nodes: node.NewStore(pool),
-		tasks: queue.NewStore(pool),
+		nodes:    node.NewStore(pool),
+		tasks:    queue.NewStore(pool),
+		adminKey: adminKey,
 	}
 
 	mux := http.NewServeMux()
@@ -46,6 +56,11 @@ func main() {
 	mux.HandleFunc("POST /api/tasks", s.handleEnqueue)
 	mux.HandleFunc("GET /api/tasks/{id}", s.handleGetTask)
 	mux.HandleFunc("GET /health", s.handleHealth)
+
+	// Admin endpoints — protected by master key
+	mux.HandleFunc("GET /api/admin/nodes", s.withAdmin(s.handleAdminListNodes))
+	mux.HandleFunc("POST /api/admin/nodes/{id}/approve", s.withAdmin(s.handleAdminApproveNode))
+	mux.HandleFunc("POST /api/admin/nodes/{id}/suspend", s.withAdmin(s.handleAdminSuspendNode))
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -246,7 +261,60 @@ func (s *server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func writeJSON(w http.ResponseWriter, status int, v interface{}) {
+// withAdmin checks for the master key in the Authorization header.
+func (s *server) withAdmin(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		key := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if key != s.adminKey {
+			writeError(w, http.StatusUnauthorized, "invalid admin key")
+			return
+		}
+		next(w, r)
+	}
+}
+
+func (s *server) handleAdminListNodes(w http.ResponseWriter, r *http.Request) {
+	status := r.URL.Query().Get("status")
+	nodes, err := s.nodes.List(r.Context(), status)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "list failed")
+		return
+	}
+	if nodes == nil {
+		nodes = []node.Node{}
+	}
+	writeJSON(w, http.StatusOK, nodes)
+}
+
+func (s *server) handleAdminApproveNode(w http.ResponseWriter, r *http.Request) {
+	nodeID := r.PathValue("id")
+	err := s.nodes.Approve(r.Context(), nodeID)
+	if errors.Is(err, node.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "node not found or not in pending status")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "approve failed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "approved"})
+}
+
+func (s *server) handleAdminSuspendNode(w http.ResponseWriter, r *http.Request) {
+	nodeID := r.PathValue("id")
+	err := s.nodes.Suspend(r.Context(), nodeID)
+	if errors.Is(err, node.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "node not found or already suspended")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "suspend failed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "suspended"})
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if v != nil {

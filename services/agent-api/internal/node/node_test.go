@@ -189,3 +189,80 @@ func TestApproveNonPending(t *testing.T) {
 		t.Fatalf("expected ErrNotFound for already-approved node, got: %v", err)
 	}
 }
+
+func TestListAllNodes(t *testing.T) {
+	pool := setupTestDB(t)
+	store := NewStore(pool)
+	ctx := context.Background()
+
+	store.Register(ctx, RegisterRequest{Name: "node-a", PublicKey: "list_key_a", Models: []string{"gemma4"}})
+	store.Register(ctx, RegisterRequest{Name: "node-b", PublicKey: "list_key_b", Models: []string{"qwen3.5"}})
+
+	nodes, err := store.List(ctx, "")
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(nodes) != 2 {
+		t.Fatalf("expected 2 nodes, got %d", len(nodes))
+	}
+}
+
+func TestListByStatus(t *testing.T) {
+	pool := setupTestDB(t)
+	store := NewStore(pool)
+	ctx := context.Background()
+
+	n1, _ := store.Register(ctx, RegisterRequest{Name: "pending-node", PublicKey: "status_key_a", Models: []string{"gemma4"}})
+	store.Register(ctx, RegisterRequest{Name: "also-pending", PublicKey: "status_key_b", Models: []string{"gemma4"}})
+	store.Approve(ctx, n1.ID)
+
+	pending, _ := store.List(ctx, "pending")
+	if len(pending) != 1 {
+		t.Fatalf("expected 1 pending, got %d", len(pending))
+	}
+
+	approved, _ := store.List(ctx, "approved")
+	if len(approved) != 1 {
+		t.Fatalf("expected 1 approved, got %d", len(approved))
+	}
+}
+
+func TestSuspendNode(t *testing.T) {
+	pool := setupTestDB(t)
+	store := NewStore(pool)
+	ctx := context.Background()
+
+	n, _ := store.Register(ctx, RegisterRequest{Name: "suspend-me", PublicKey: "suspend_key", Models: []string{"gemma4"}})
+	store.Approve(ctx, n.ID)
+	store.Activate(ctx, n.ID)
+
+	err := store.Suspend(ctx, n.ID)
+	if err != nil {
+		t.Fatalf("Suspend failed: %v", err)
+	}
+
+	updated, _ := store.GetByPublicKey(ctx, "suspend_key")
+	if updated.Status != "suspended" {
+		t.Fatalf("expected 'suspended', got %s", updated.Status)
+	}
+
+	// Heartbeat on suspended node should fail
+	err = store.Heartbeat(ctx, n.ID)
+	if err != ErrNotFound {
+		t.Fatalf("expected ErrNotFound for suspended node, got: %v", err)
+	}
+}
+
+func TestSuspendAlreadySuspended(t *testing.T) {
+	pool := setupTestDB(t)
+	store := NewStore(pool)
+	ctx := context.Background()
+
+	n, _ := store.Register(ctx, RegisterRequest{Name: "double-suspend", PublicKey: "double_suspend_key", Models: []string{"gemma4"}})
+	store.Suspend(ctx, n.ID)
+
+	err := store.Suspend(ctx, n.ID)
+	if err != ErrNotFound {
+		t.Fatalf("expected ErrNotFound for already-suspended, got: %v", err)
+	}
+}

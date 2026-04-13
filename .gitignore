@@ -12,6 +12,11 @@ docs/VISION.md
 # Docker volumes
 postgres-data/
 
+# Python
+__pycache__/
+.venv/
+*.pyc
+
 # Go binaries
 services/agent-api/agent-api
 services/gateway-agent/gateway-agent

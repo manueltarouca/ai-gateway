@@ -28,6 +28,8 @@ type Task struct {
 	Parameters  json.RawMessage `json:"parameters"`
 	Status      string    `json:"status"`
 	AssignedNode *string  `json:"assigned_node,omitempty"`
+	Result      json.RawMessage `json:"result,omitempty"`
+	TokensUsed  *int     `json:"tokens_used,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	AssignedAt  *time.Time `json:"assigned_at,omitempty"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
@@ -141,10 +143,10 @@ func (s *Store) Get(ctx context.Context, taskID string) (*Task, error) {
 	var msgRaw []byte
 
 	err := s.pool.QueryRow(ctx,
-		`SELECT id, model, messages, max_tokens, parameters, status, assigned_node, created_at, assigned_at, completed_at
+		`SELECT id, model, messages, max_tokens, parameters, status, assigned_node, result, tokens_used, created_at, assigned_at, completed_at
 		 FROM tasks WHERE id = $1`,
 		taskID,
-	).Scan(&t.ID, &t.Model, &msgRaw, &t.MaxTokens, &t.Parameters, &t.Status, &t.AssignedNode, &t.CreatedAt, &t.AssignedAt, &t.CompletedAt)
+	).Scan(&t.ID, &t.Model, &msgRaw, &t.MaxTokens, &t.Parameters, &t.Status, &t.AssignedNode, &t.Result, &t.TokensUsed, &t.CreatedAt, &t.AssignedAt, &t.CompletedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound

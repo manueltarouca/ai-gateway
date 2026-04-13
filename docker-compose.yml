@@ -9,6 +9,7 @@ services:
       - '5432:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U litellm']
       interval: 5s
@@ -21,6 +22,7 @@ services:
       - '4000:4000'
     volumes:
       - ./infrastructure/gateway-config.yaml:/app/config.yaml
+      - ./infrastructure/community/provider.py:/app/community/provider.py
     command:
       - '--config=/app/config.yaml'
       - '--port=4000'
@@ -28,6 +30,23 @@ services:
     environment:
       - DATABASE_URL=postgresql://litellm:litellm-local-dev@postgres:5432/litellm
       - LITELLM_MASTER_KEY=sk-local-dev-master-key
+      - AGENT_API_URL=http://agent-api:9090
+      - PYTHONPATH=/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      agent-api:
+        condition: service_started
+
+  agent-api:
+    build:
+      context: ./services/agent-api
+      dockerfile: Dockerfile
+    ports:
+      - '9090:9090'
+    environment:
+      - DATABASE_URL=postgresql://litellm:litellm-local-dev@postgres:5432/litellm
+      - PORT=9090
     depends_on:
       postgres:
         condition: service_healthy

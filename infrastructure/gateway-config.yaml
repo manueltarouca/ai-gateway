@@ -1,18 +1,34 @@
 model_list:
+  # Trusted tier — direct to local Ollama
   - model_name: qwen3.5
     litellm_params:
       model: ollama/qwen3.5:9B
       api_base: http://host.containers.internal:11434
       merge_reasoning_content_in_choices: true
+      order: 1
   - model_name: gemma4
     litellm_params:
       model: ollama/gemma4:e4b
       api_base: http://host.containers.internal:11434
       merge_reasoning_content_in_choices: true
+      order: 1
+
+  # Community tier — routed through agent task queue
+  - model_name: qwen3.5
+    litellm_params:
+      model: community/qwen3.5:9B
+      order: 2
+  - model_name: gemma4
+    litellm_params:
+      model: community/gemma4:e4b
+      order: 2
 
 litellm_settings:
   turn_off_message_logging: true
   global_disable_no_log_param: true
+  custom_provider_map:
+    - provider: community
+      custom_handler: community.provider.handler
 
 general_settings:
   master_key: sk-local-dev-master-key

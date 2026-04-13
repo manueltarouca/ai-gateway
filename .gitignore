@@ -12,6 +12,10 @@ docs/VISION.md
 # Docker volumes
 postgres-data/
 
+# Go binaries
+services/agent-api/agent-api
+services/gateway-agent/gateway-agent
+
 # OS files
 .DS_Store
 Thumbs.db
